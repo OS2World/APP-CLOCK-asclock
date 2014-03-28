@@ -1,0 +1,10 @@
+* This is asclock which can be docked under WindowMaker.
+  The source is got from ftp://ftp.windowmaker.org/pub/contrib/srcs/apps/.
+
+* Change: 
+  - Add support of WindowMaker raster graphics library so that it can do
+    color dithering in 8bpp mode
+
+--
+Hung-Chi Chu <hcchu@r350.ee.ntu.edu.tw>
+

@@ -1,0 +1,121 @@
+diff -ru -x Makefile -x exports -x COPYING.LIB -x INSTALL -N asclock.orig/asclock.c asclock/asclock.c
+--- asclock.orig/asclock.c	Tue Mar 24 18:58:56 1998
++++ asclock/asclock.c	Thu Mar 11 17:42:58 1999
+@@ -13,6 +13,10 @@
+ #include "xpm/mask.xbm"
+ #include "xpm/mask.xpm"
+ 
++#ifdef USE_WRLIB
++#include <wraster.h>
++RContext *rcontext;
++#endif
+ int SHOWAMPM=0;  /* default value is 24h format */
+ int ONLYSHAPE=0; /* default value is noshape */
+ int ITBLINKS=1;  /* default is blinking */
+@@ -45,7 +49,11 @@
+ char *ProgName;
+ char *Geometry;
+ char *LedColor = "LightSeaGreen";
++#ifndef __EMX__
+ char Execute[] = "echo no program has been specified >/dev/console";
++#else
++char Execute[] = "echo asclock: no program has been specified";
++#endif
+ char *ERR_colorcells = "not enough free color cells\n";
+ char *ampers = " &";
+ /* XPM Variablen *************************************************************/
+@@ -62,7 +70,9 @@
+ 
+ /* lokale Funktionen *********************************************************/
+ #define MW_EVENTS   (ExposureMask | ButtonPressMask | StructureNotifyMask)
++#ifndef FALSE
+ #define FALSE 0
++#endif
+ void GetXPM(void);
+ static void CreatePixmap(Display *dpy, Window Root, char **data, XpmIcon* icon);
+ Pixel GetColor(char *name);
+@@ -166,6 +176,9 @@
+       exit (1); 
+     } 
+   screen= DefaultScreen(dpy);
++#ifdef USE_WRLIB
++  rcontext = RCreateContext(dpy, screen, NULL);
++#endif
+   Root = RootWindow(dpy, screen);
+   d_depth = DefaultDepth(dpy, screen);
+   x_fd = XConnectionNumber(dpy);
+@@ -293,7 +306,11 @@
+ #ifdef SYSV
+       poll((struct poll *) 0, (size_t) 0, 50);
+ #else
++#ifndef __EMX__
+       usleep(50000L);			/* 5/100 sec */
++#else
++      _sleep2(50);			/* 5/100 sec */
++#endif
+ #endif
+     }
+   return 0;
+@@ -349,15 +366,29 @@
+ static void CreatePixmap(Display *dpy, Window Root, char **data, XpmIcon* icon)
+ {
+   int ret;
++#ifdef USE_WRLIB
++  RImage *img;
++#endif
+ 
+   icon->attributes.valuemask |= (XpmReturnPixels | XpmReturnExtensions
+ 				 | XpmExactColors | XpmCloseness);
+   icon->attributes.exactColors=False;
+   icon->attributes.closeness=40000;
++#ifndef USE_WRLIB
+   ret = XpmCreatePixmapFromData(dpy, Root, data, &(icon->pixmap), 
+ 				&(icon->mask), &(icon->attributes));
+   if(ret != XpmSuccess)
+     {fprintf(stderr, ERR_colorcells);exit(1);}
++#else
++  if ((img = RGetImageFromXPMData(rcontext, data)) == NULL)
++    {fprintf(stderr, "%s\n", RMessageForError(RErrorCode));exit(1);}
++  icon->attributes.width = img->width;
++  icon->attributes.height = img->height;
++  if (RConvertImageMask(rcontext, img, &(icon->pixmap), &(icon->mask), 128)
++       == False)
++    {fprintf(stderr, "%s\n", RMessageForError(RErrorCode));RDestroyImage(img);exit(1);}
++  RDestroyImage(img);
++#endif
+ }
+ /****************************************************************************/
+ /* Removes expose events for a specific window from the queue */
+diff -ru -x Makefile -x exports -x COPYING.LIB -x INSTALL -N asclock.orig/asclockos2.def asclock/asclockos2.def
+--- asclock.orig/asclockos2.def	Thu Jan  1 00:00:00 1970
++++ asclock/asclockos2.def	Thu Mar 11 17:51:44 1999
+@@ -0,0 +1,2 @@
++NAME WINDOWCOMPAT
++STACKSIZE 524288
+diff -ru -x Makefile -x exports -x COPYING.LIB -x INSTALL -N asclock.orig/Imakefile asclock/Imakefile
+--- asclock.orig/Imakefile	Wed Jul 23 00:06:04 1997
++++ asclock/Imakefile	Thu Mar 11 17:50:32 1999
+@@ -1,8 +1,21 @@
++#define BuildOMFEXE	YES
++#define UseWRlib	YES
+ 
+-XPMLIB = -L/usr/lib/X11 -lXpm   
++#include <os2port.cf>
++
++PROG_OMF_DEF = asclockos2.def
++
++#if UseWRlib
++	USE_WRLIB = -DUSE_WRLIB
++	WRLIB = -lwraster
++#endif
++
++	DEFINES = $(USE_WRLIB)
++
++XPMLIB = -lXpm   
+ DEPLIBS = $(DEPXLIB) 
+ 
+-LOCAL_LIBRARIES = $(XPMLIB) $(XLIB)  
++LOCAL_LIBRARIES = $(WRLIB) $(XPMLIB) $(XLIB)
+ 
+ LINTLIBS = $(LINTXLIB)
+ 
